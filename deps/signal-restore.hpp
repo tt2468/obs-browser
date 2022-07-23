@@ -1,6 +1,5 @@
 /******************************************************************************
- Copyright (C) 2014 by John R. Bradley <jrb@turrettech.com>
- Copyright (C) 2018 by Hugh Bailey ("Jim") <jim@obsproject.com>
+ Copyright (C) 2022 by Kyle Manning <tt2468@gmail.com>
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -18,14 +17,5 @@
 
 #pragma once
 
-#include "cef-headers.hpp"
-#include <string>
-#include <fstream>
-
-class BrowserSchemeHandlerFactory : public CefSchemeHandlerFactory {
-public:
-	virtual CefRefPtr<CefResourceHandler>
-	Create(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame>, const CefString &, CefRefPtr<CefRequest> request) override;
-
-	IMPLEMENT_REFCOUNTING(BrowserSchemeHandlerFactory);
-};
+void BackupSignalHandlers();
+void RestoreSignalHandlers();

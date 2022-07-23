@@ -22,7 +22,6 @@
 #include "wide-string.hpp"
 #include "json11/json11.hpp"
 #include <util/threading.h>
-#include <QApplication>
 #include <util/dstr.h>
 #include <functional>
 #include <thread>
@@ -30,11 +29,6 @@
 
 #ifdef __linux__
 #include "linux-keyboard-helpers.hpp"
-#endif
-
-#ifdef ENABLE_BROWSER_QT_LOOP
-#include <QEventLoop>
-#include <QThread>
 #endif
 
 using namespace std;
@@ -50,7 +44,6 @@ static void SendBrowserVisibility(CefRefPtr<CefBrowser> browser, bool isVisible)
 	if (!browser)
 		return;
 
-#if ENABLE_WASHIDDEN
 	if (isVisible) {
 		browser->GetHost()->WasResized();
 		browser->GetHost()->WasHidden(false);
@@ -58,35 +51,18 @@ static void SendBrowserVisibility(CefRefPtr<CefBrowser> browser, bool isVisible)
 	} else {
 		browser->GetHost()->WasHidden(true);
 	}
-#endif
 
-	CefRefPtr<CefProcessMessage> msg =
-		CefProcessMessage::Create("Visibility");
+	CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("Visibility");
 	CefRefPtr<CefListValue> args = msg->GetArgumentList();
 	args->SetBool(0, isVisible);
 	SendBrowserProcessMessage(browser, PID_RENDERER, msg);
 }
 
-void DispatchJSEvent(std::string eventName, std::string jsonString,
-		     BrowserSource *browser = nullptr);
+void DispatchJSEvent(std::string eventName, std::string jsonString, BrowserSource *browser = nullptr);
 
 BrowserSource::BrowserSource(obs_data_t *, obs_source_t *source_)
 	: source(source_)
 {
-
-	/* Register Refresh hotkey */
-	auto refreshFunction = [](void *data, obs_hotkey_id, obs_hotkey_t *,
-				  bool pressed) {
-		if (pressed) {
-			BrowserSource *bs = (BrowserSource *)data;
-			bs->Refresh();
-		}
-	};
-
-	obs_hotkey_register_source(source, "ObsBrowser.Refresh",
-				   obs_module_text("RefreshNoCache"),
-				   refreshFunction, (void *)this);
-
 	/* defer update */
 	obs_source_update(source, nullptr);
 
@@ -107,10 +83,10 @@ static void ActuallyCloseBrowser(CefRefPtr<CefBrowser> cefBrowser)
 	}
 
 	/*
-         * This stops rendering
-         * http://magpcss.org/ceforum/viewtopic.php?f=6&t=12079
-         * https://bitbucket.org/chromiumembedded/cef/issues/1363/washidden-api-got-broken-on-branch-2062)
-         */
+	 * This stops rendering
+	 * http://magpcss.org/ceforum/viewtopic.php?f=6&t=12079
+	 * https://bitbucket.org/chromiumembedded/cef/issues/1363/washidden-api-got-broken-on-branch-2062)
+	 */
 	cefBrowser->GetHost()->WasHidden(true);
 	cefBrowser->GetHost()->CloseBrowser(true);
 }
@@ -137,13 +113,6 @@ void BrowserSource::Destroy()
 void BrowserSource::ExecuteOnBrowser(BrowserFunc func, bool async)
 {
 	if (!async) {
-#ifdef ENABLE_BROWSER_QT_LOOP
-		if (QThread::currentThread() == qApp->thread()) {
-			if (!!cefBrowser)
-				func(cefBrowser);
-			return;
-		}
-#endif
 		os_event_t *finishedEvent;
 		os_event_init(&finishedEvent, OS_EVENT_TYPE_AUTO);
 		bool success = QueueCEFTask([&]() {
@@ -158,11 +127,7 @@ void BrowserSource::ExecuteOnBrowser(BrowserFunc func, bool async)
 	} else {
 		CefRefPtr<CefBrowser> browser = GetBrowser();
 		if (!!browser) {
-#ifdef ENABLE_BROWSER_QT_LOOP
-			QueueBrowserTask(cefBrowser, func);
-#else
 			QueueCEFTask([=]() { func(browser); });
-#endif
 		}
 	}
 }
@@ -170,73 +135,28 @@ void BrowserSource::ExecuteOnBrowser(BrowserFunc func, bool async)
 bool BrowserSource::CreateBrowser()
 {
 	return QueueCEFTask([this]() {
-#ifdef ENABLE_BROWSER_SHARED_TEXTURE
-		if (hwaccel) {
-			obs_enter_graphics();
-			tex_sharing_avail = gs_shared_texture_available();
-			obs_leave_graphics();
-		}
-#else
 		bool hwaccel = false;
-#endif
 
-		CefRefPtr<BrowserClient> browserClient =
-			new BrowserClient(this, hwaccel && tex_sharing_avail,
-					  reroute_audio, webpage_control_level);
+		CefRefPtr<BrowserClient> browserClient = new BrowserClient(this, hwaccel && tex_sharing_avail);
 
 		CefWindowInfo windowInfo;
-#if CHROME_VERSION_BUILD < 4430
-		windowInfo.width = width;
-		windowInfo.height = height;
-#else
 		windowInfo.bounds.width = width;
 		windowInfo.bounds.height = height;
-#endif
 		windowInfo.windowless_rendering_enabled = true;
-
-#ifdef ENABLE_BROWSER_SHARED_TEXTURE
-		windowInfo.shared_texture_enabled = hwaccel;
-#endif
 
 		CefBrowserSettings cefBrowserSettings;
 
-#ifdef ENABLE_BROWSER_SHARED_TEXTURE
-#ifdef BROWSER_EXTERNAL_BEGIN_FRAME_ENABLED
-		if (!fps_custom) {
-			windowInfo.external_begin_frame_enabled = true;
-			cefBrowserSettings.windowless_frame_rate = 0;
-		} else {
-			cefBrowserSettings.windowless_frame_rate = fps;
-		}
-#else
-		struct obs_video_info ovi;
-		obs_get_video_info(&ovi);
-		canvas_fps = (double)ovi.fps_num / (double)ovi.fps_den;
-		cefBrowserSettings.windowless_frame_rate =
-			(fps_custom) ? fps : canvas_fps;
-#endif
-#else
 		cefBrowserSettings.windowless_frame_rate = fps;
-#endif
 
 		cefBrowserSettings.default_font_size = 16;
 		cefBrowserSettings.default_fixed_font_size = 16;
 
-#if ENABLE_LOCAL_FILE_URL_SCHEME && CHROME_VERSION_BUILD < 4430
-		if (is_local) {
-			/* Disable web security for file:// URLs to allow
-			 * local content access to remote APIs */
-			cefBrowserSettings.web_security = STATE_DISABLED;
-		}
-#endif
-		auto browser = CefBrowserHost::CreateBrowserSync(
-			windowInfo, browserClient, url, cefBrowserSettings,
-			CefRefPtr<CefDictionaryValue>(), nullptr);
+		auto browser = CefBrowserHost::CreateBrowserSync(windowInfo, browserClient, url, cefBrowserSettings, CefRefPtr<CefDictionaryValue>(), nullptr);
 
 		SetBrowser(browser);
 
-		if (reroute_audio)
-			cefBrowser->GetHost()->SetAudioMuted(true);
+		cefBrowser->GetHost()->SetAudioMuted(true);
+
 		if (obs_source_showing(source))
 			is_showing = true;
 
@@ -249,16 +169,7 @@ void BrowserSource::DestroyBrowser()
 	ExecuteOnBrowser(ActuallyCloseBrowser, true);
 	SetBrowser(nullptr);
 }
-#if CHROME_VERSION_BUILD < 4103
-void BrowserSource::ClearAudioStreams()
-{
-	QueueCEFTask([this]() {
-		audio_streams.clear();
-		std::lock_guard<std::mutex> lock(audio_sources_mutex);
-		audio_sources.clear();
-	});
-}
-#endif
+
 void BrowserSource::SendMouseClick(const struct obs_mouse_event *event,
 				   int32_t type, bool mouse_up,
 				   uint32_t click_count)
@@ -323,11 +234,7 @@ void BrowserSource::SendFocus(bool focus)
 {
 	ExecuteOnBrowser(
 		[=](CefRefPtr<CefBrowser> cefBrowser) {
-#if CHROME_VERSION_BUILD < 4430
-			cefBrowser->GetHost()->SendFocusEvent(focus);
-#else
 			cefBrowser->GetHost()->SetFocus(focus);
-#endif
 		},
 		true);
 }
@@ -341,9 +248,6 @@ void BrowserSource::SendKeyClick(const struct obs_key_event *event, bool key_up)
 #ifdef __linux__
 	uint32_t native_vkey = KeyboardCodeFromXKeysym(event->native_vkey);
 	uint32_t modifiers = event->native_modifiers;
-#elif defined(_WIN32) || defined(__APPLE__)
-	uint32_t native_vkey = event->native_vkey;
-	uint32_t modifiers = event->modifiers;
 #else
 	uint32_t native_vkey = event->native_vkey;
 	uint32_t native_scancode = event->native_scancode;
@@ -354,9 +258,6 @@ void BrowserSource::SendKeyClick(const struct obs_key_event *event, bool key_up)
 		[=](CefRefPtr<CefBrowser> cefBrowser) {
 			CefKeyEvent e;
 			e.windows_key_code = native_vkey;
-#ifdef __APPLE__
-			e.native_key_code = native_vkey;
-#endif
 
 			e.type = key_up ? KEYEVENT_KEYUP : KEYEVENT_RAWKEYDOWN;
 
@@ -375,8 +276,6 @@ void BrowserSource::SendKeyClick(const struct obs_key_event *event, bool key_up)
 #ifdef __linux__
 				e.windows_key_code =
 					KeyboardCodeFromXKeysym(e.character);
-#elif defined(_WIN32)
-				e.windows_key_code = e.character;
 #elif !defined(__APPLE__)
 				e.native_key_code = native_scancode;
 #endif
@@ -413,12 +312,6 @@ void BrowserSource::SetShowing(bool showing)
 			true);
 		Json json = Json::object{{"visible", showing}};
 		DispatchJSEvent("obsSourceVisibleChanged", json.dump(), this);
-#if defined(BROWSER_EXTERNAL_BEGIN_FRAME_ENABLED) && \
-	defined(ENABLE_BROWSER_SHARED_TEXTURE)
-		if (showing && !fps_custom) {
-			reset_frame = false;
-		}
-#endif
 
 		SendBrowserVisibility(cefBrowser, showing);
 
@@ -472,23 +365,6 @@ CefRefPtr<CefBrowser> BrowserSource::GetBrowser()
 	return cefBrowser;
 }
 
-#ifdef ENABLE_BROWSER_SHARED_TEXTURE
-#ifdef BROWSER_EXTERNAL_BEGIN_FRAME_ENABLED
-inline void BrowserSource::SignalBeginFrame()
-{
-	if (reset_frame) {
-		ExecuteOnBrowser(
-			[](CefRefPtr<CefBrowser> cefBrowser) {
-				cefBrowser->GetHost()->SendExternalBeginFrame();
-			},
-			true);
-
-		reset_frame = false;
-	}
-}
-#endif
-#endif
-
 void BrowserSource::Update(obs_data_t *settings)
 {
 	if (settings) {
@@ -499,8 +375,6 @@ void BrowserSource::Update(obs_data_t *settings)
 		int n_fps;
 		bool n_shutdown;
 		bool n_restart;
-		bool n_reroute;
-		ControlLevel n_webpage_control_level;
 		std::string n_url;
 		std::string n_css;
 
@@ -512,23 +386,10 @@ void BrowserSource::Update(obs_data_t *settings)
 		n_shutdown = obs_data_get_bool(settings, "shutdown");
 		n_restart = obs_data_get_bool(settings, "restart_when_active");
 		n_css = obs_data_get_string(settings, "css");
-		n_url = obs_data_get_string(settings,
-					    n_is_local ? "local_file" : "url");
-		n_reroute = obs_data_get_bool(settings, "reroute_audio");
-		n_webpage_control_level = static_cast<ControlLevel>(
-			obs_data_get_int(settings, "webpage_control_level"));
+		n_url = obs_data_get_string(settings, n_is_local ? "local_file" : "url");
 
 		if (n_is_local && !n_url.empty()) {
 			n_url = CefURIEncode(n_url, false);
-
-#ifdef _WIN32
-			size_t slash = n_url.find("%2F");
-			size_t colon = n_url.find("%3A");
-
-			if (slash != std::string::npos &&
-			    colon != std::string::npos && colon < slash)
-				n_url.replace(colon, 3, ":");
-#endif
 
 			while (n_url.find("%5C") != std::string::npos)
 				n_url.replace(n_url.find("%5C"), 3, "/");
@@ -536,34 +397,13 @@ void BrowserSource::Update(obs_data_t *settings)
 			while (n_url.find("%2F") != std::string::npos)
 				n_url.replace(n_url.find("%2F"), 3, "/");
 
-#if !ENABLE_LOCAL_FILE_URL_SCHEME
 			/* http://absolute/ based mapping for older CEF */
 			n_url = "http://absolute/" + n_url;
-#elif defined(_WIN32)
-			/* Widows-style local file URL:
-			 * file:///C:/file/path.webm */
-			n_url = "file:///" + n_url;
-#else
-			/* UNIX-style local file URL:
-			 * file:///home/user/file.webm */
-			n_url = "file://" + n_url;
-#endif
 		}
-
-#if ENABLE_LOCAL_FILE_URL_SCHEME
-		if (astrcmpi_n(n_url.c_str(), "http://absolute/", 16) == 0) {
-			/* Replace http://absolute/ URLs with file://
-			 * URLs if file:// URLs are enabled */
-			n_url = "file:///" + n_url.substr(16);
-			n_is_local = true;
-		}
-#endif
 
 		if (n_is_local == is_local && n_fps_custom == fps_custom &&
 		    n_fps == fps && n_shutdown == shutdown_on_invisible &&
-		    n_restart == restart && n_css == css && n_url == url &&
-		    n_reroute == reroute_audio &&
-		    n_webpage_control_level == webpage_control_level) {
+		    n_restart == restart && n_css == css && n_url == url) {
 
 			if (n_width == width && n_height == height)
 				return;
@@ -576,8 +416,7 @@ void BrowserSource::Update(obs_data_t *settings)
 					cefBrowser->GetHost()
 						->GetClient()
 						->GetDisplayHandler()
-						->OnAutoResize(cefBrowser,
-							       cefSize);
+						->OnAutoResize(cefBrowser, cefSize);
 					cefBrowser->GetHost()->WasResized();
 					cefBrowser->GetHost()->Invalidate(
 						PET_VIEW);
@@ -592,20 +431,16 @@ void BrowserSource::Update(obs_data_t *settings)
 		fps = n_fps;
 		fps_custom = n_fps_custom;
 		shutdown_on_invisible = n_shutdown;
-		reroute_audio = n_reroute;
-		webpage_control_level = n_webpage_control_level;
 		restart = n_restart;
 		css = n_css;
 		url = n_url;
 
-		obs_source_set_audio_active(source, reroute_audio);
+		obs_source_set_audio_active(source, true);
 	}
 
 	DestroyBrowser();
 	DestroyTextures();
-#if CHROME_VERSION_BUILD < 4103
-	ClearAudioStreams();
-#endif
+
 	if (!shutdown_on_invisible || obs_source_showing(source))
 		create_browser = true;
 
@@ -616,24 +451,6 @@ void BrowserSource::Tick()
 {
 	if (create_browser && CreateBrowser())
 		create_browser = false;
-#if defined(ENABLE_BROWSER_SHARED_TEXTURE)
-#if defined(BROWSER_EXTERNAL_BEGIN_FRAME_ENABLED)
-	if (!fps_custom)
-		reset_frame = true;
-#else
-	struct obs_video_info ovi;
-	obs_get_video_info(&ovi);
-	double video_fps = (double)ovi.fps_num / (double)ovi.fps_den;
-
-	if (!fps_custom) {
-		if (!!cefBrowser && canvas_fps != video_fps) {
-			cefBrowser->GetHost()->SetWindowlessFrameRate(
-				video_fps);
-			canvas_fps = video_fps;
-		}
-	}
-#endif
-#endif
 }
 
 extern void ProcessCef();
@@ -641,18 +458,9 @@ extern void ProcessCef();
 void BrowserSource::Render()
 {
 	bool flip = false;
-#ifdef ENABLE_BROWSER_SHARED_TEXTURE
-	flip = hwaccel;
-#endif
 
 	if (texture) {
-#ifdef __APPLE__
-		gs_effect_t *effect =
-			obs_get_base_effect((hwaccel) ? OBS_EFFECT_DEFAULT_RECT
-						      : OBS_EFFECT_DEFAULT);
-#else
 		gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
-#endif
 
 		bool linear_sample = extra_texture == NULL;
 		gs_texture_t *draw_texture = texture;
@@ -670,8 +478,7 @@ void BrowserSource::Render()
 		gs_blend_state_push();
 		gs_blend_function(GS_BLEND_ONE, GS_BLEND_INVSRCALPHA);
 
-		gs_eparam_t *const image =
-			gs_effect_get_param_by_name(effect, "image");
+		gs_eparam_t *const image = gs_effect_get_param_by_name(effect, "image");
 
 		const char *tech;
 		if (linear_sample) {
@@ -690,13 +497,6 @@ void BrowserSource::Render()
 
 		gs_enable_framebuffer_srgb(previous);
 	}
-
-#if defined(BROWSER_EXTERNAL_BEGIN_FRAME_ENABLED) && \
-	defined(ENABLE_BROWSER_SHARED_TEXTURE)
-	SignalBeginFrame();
-#elif defined(ENABLE_BROWSER_QT_LOOP)
-	ProcessCef();
-#endif
 }
 
 static void ExecuteOnBrowser(BrowserFunc func, BrowserSource *bs)
@@ -721,12 +521,10 @@ static void ExecuteOnAllBrowsers(BrowserFunc func)
 	}
 }
 
-void DispatchJSEvent(std::string eventName, std::string jsonString,
-		     BrowserSource *browser)
+void DispatchJSEvent(std::string eventName, std::string jsonString, BrowserSource *browser)
 {
 	const auto jsEvent = [=](CefRefPtr<CefBrowser> cefBrowser) {
-		CefRefPtr<CefProcessMessage> msg =
-			CefProcessMessage::Create("DispatchJSEvent");
+		CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("DispatchJSEvent");
 		CefRefPtr<CefListValue> args = msg->GetArgumentList();
 
 		args->SetString(0, eventName);
