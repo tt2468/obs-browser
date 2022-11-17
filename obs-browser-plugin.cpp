@@ -180,8 +180,14 @@ static void BrowserInit(void)
 	struct obs_cmdline_args cmdline_args = obs_get_cmdline_args();
 	CefMainArgs args(cmdline_args.argc, cmdline_args.argv);
 
+	BPtr<char> conf_path = obs_module_config_path("");
+	os_mkdir(conf_path);
+
 	CefSettings settings;
 	settings.log_severity = LOGSEVERITY_DISABLE;
+	BPtr<char> log_path = obs_module_config_path("debug.log");
+	BPtr<char> log_path_abs = os_get_abs_path_ptr(log_path);
+	CefString(&settings.log_file) = log_path_abs;
 	settings.windowless_rendering_enabled = true;
 	settings.no_sandbox = true;
 
@@ -221,8 +227,6 @@ static void BrowserInit(void)
 		accepted_languages = "en-US,en";
 	}
 
-	BPtr<char> conf_path = obs_module_config_path("");
-	os_mkdir(conf_path);
 	BPtr<char> conf_path_abs = os_get_abs_path_ptr(conf_path);
 	CefString(&settings.locale) = obs_get_locale();
 	CefString(&settings.accept_language_list) = accepted_languages;
