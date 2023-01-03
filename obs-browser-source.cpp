@@ -63,6 +63,22 @@ void DispatchJSEvent(std::string eventName, std::string jsonString, BrowserSourc
 BrowserSource::BrowserSource(obs_data_t *, obs_source_t *source_)
 	: source(source_)
 {
+	auto jsEventFunction = [](void *p, calldata_t *calldata) {
+		const auto eventName = calldata_string(calldata, "eventName");
+		if (!eventName)
+			return;
+		auto jsonString = calldata_string(calldata, "jsonString");
+		if (!jsonString)
+			jsonString = "null";
+		DispatchJSEvent(eventName, jsonString, (BrowserSource *)p);
+	};
+
+	proc_handler_t *ph = obs_source_get_proc_handler(source);
+	proc_handler_add(
+		ph,
+		"void javascript_event(string eventName, string jsonString)",
+		jsEventFunction, (void *)this);
+
 	/* defer update */
 	obs_source_update(source, nullptr);
 
