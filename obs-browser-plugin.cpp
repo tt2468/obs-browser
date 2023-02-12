@@ -143,8 +143,8 @@ static obs_properties_t *browser_source_get_properties(void *data)
 	obs_properties_add_path(props, "local_file", obs_module_text("LocalFile"), OBS_PATH_FILE, "*.*", path->array);
 	obs_properties_add_text(props, "url", obs_module_text("URL"), OBS_TEXT_DEFAULT);
 
-	obs_properties_add_int(props, "width", obs_module_text("Width"), 1, 4096, 1);
-	obs_properties_add_int(props, "height", obs_module_text("Height"), 1, 4096, 1);
+	obs_properties_add_int(props, "width", obs_module_text("Width"), 1, 8192, 1);
+	obs_properties_add_int(props, "height", obs_module_text("Height"), 1, 8192, 1);
 
 	obs_properties_add_bool(props, "reroute_audio", obs_module_text("RerouteAudio"));
 
