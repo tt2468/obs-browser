@@ -257,6 +257,8 @@ static void BrowserInit(void)
 
 static void BrowserShutdown(void)
 {
+	CefClearSchemeHandlerFactories();
+
 	CefShutdown();
 	app = nullptr;
 }
