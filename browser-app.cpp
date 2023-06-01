@@ -18,7 +18,7 @@
 
 #include "browser-app.hpp"
 #include "browser-version.h"
-#include <json11/json11.hpp>
+#include <nlohmann/json.hpp>
 
 #ifndef UNUSED_PARAMETER
 #define UNUSED_PARAMETER(x) \
@@ -26,8 +26,6 @@
 		(void)x;    \
 	}
 #endif
-
-using namespace json11;
 
 CefRefPtr<CefRenderProcessHandler> BrowserApp::GetRenderProcessHandler()
 {
@@ -131,14 +129,13 @@ bool BrowserApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefP
 
 		CefRefPtr<CefV8Value> globalObj = context->GetGlobal();
 
-		std::string err;
-		auto payloadJson =
-			Json::parse(args->GetString(1).ToString(), err);
+		nlohmann::json payloadJson = nlohmann::json::parse(
+			args->GetString(1).ToString(), nullptr, false);
 
-		Json::object wrapperJson;
+		nlohmann::json wrapperJson;
 		if (args->GetSize() > 1)
 			wrapperJson["detail"] = payloadJson;
-		std::string wrapperJsonString = Json(wrapperJson).dump();
+		std::string wrapperJsonString = wrapperJson.dump();
 		std::string script;
 
 		script += "new CustomEvent('";

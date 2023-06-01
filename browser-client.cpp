@@ -19,12 +19,10 @@
 #include "browser-client.hpp"
 #include "obs-browser-source.hpp"
 #include "base64/base64.hpp"
-#include "json11/json11.hpp"
+#include <nlohmann/json.hpp>
 #include <obs-frontend-api.h>
 #include <obs.hpp>
 #include <util/platform.h>
-
-using namespace json11;
 
 inline bool BrowserClient::valid() const
 {
@@ -109,13 +107,12 @@ bool BrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefR
 {
 	const std::string &name = message->GetName();
 	CefRefPtr<CefListValue> input_args = message->GetArgumentList();
-	Json json;
 
 	if (!valid()) {
 		return false;
 	}
 
-	json = Json::object{ {"test", "object"}, {"r", name} };
+	nlohmann::json json = { {"test", "object"}, {"r", name} };
 
 	CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("executeCallback");
 

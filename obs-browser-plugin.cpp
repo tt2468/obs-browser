@@ -35,7 +35,6 @@
 #include "browser-config.h"
 
 #include "signal-restore.hpp"
-#include "json11/json11.hpp"
 #include "obs-websocket-api/obs-websocket-api.h"
 #include "cef-headers.hpp"
 
@@ -47,7 +46,6 @@ MODULE_EXPORT const char *obs_module_description(void)
 }
 
 using namespace std;
-using namespace json11;
 
 static thread manager_thread;
 static bool manager_initialized = false;

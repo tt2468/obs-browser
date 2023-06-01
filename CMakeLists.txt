@@ -15,6 +15,7 @@ if(NOT ENABLE_BROWSER)
 endif()
 
 find_package(CEF REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 if(NOT TARGET CEF::Wrapper)
   message(
@@ -42,8 +43,6 @@ target_sources(
           browser-scheme.hpp
           browser-version.h
           cef-headers.hpp
-          deps/json11/json11.cpp
-          deps/json11/json11.hpp
           deps/base64/base64.cpp
           deps/base64/base64.hpp
           deps/wide-string.cpp
@@ -56,7 +55,7 @@ target_sources(
 target_include_directories(obs-browser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps
                                                ${CMAKE_BINARY_DIR}/config)
 
-target_link_libraries(obs-browser PRIVATE OBS::libobs OBS::frontend-api)
+target_link_libraries(obs-browser PRIVATE OBS::libobs OBS::frontend-api nlohmann_json::nlohmann_json)
 
 target_compile_features(obs-browser PRIVATE cxx_std_17)
 
@@ -66,8 +65,7 @@ add_executable(obs-browser-page)
 target_sources(
   obs-browser-page
   PRIVATE cef-headers.hpp obs-browser-page/obs-browser-page-main.cpp
-          browser-app.cpp browser-app.hpp deps/json11/json11.cpp
-          deps/json11/json11.hpp)
+          browser-app.cpp browser-app.hpp)
 
 target_link_libraries(obs-browser-page PRIVATE CEF::Library)
 
