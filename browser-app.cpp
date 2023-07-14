@@ -90,18 +90,24 @@ void BrowserApp::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFr
 
 void BrowserApp::ExecuteJSFunction(CefRefPtr<CefBrowser> browser, const char *functionName, CefV8ValueList arguments)
 {
-	CefRefPtr<CefV8Context> context = browser->GetMainFrame()->GetV8Context();
+	std::vector<CefString> names;
+	browser->GetFrameNames(names);
 
-	context->Enter();
+	for (auto &name : names) {
+		CefRefPtr<CefFrame> frame = browser->GetFrame(name);
+		CefRefPtr<CefV8Context> context = frame->GetV8Context();
 
-	CefRefPtr<CefV8Value> globalObj = context->GetGlobal();
-	CefRefPtr<CefV8Value> irltkObj = globalObj->GetValue("irltk");
-	CefRefPtr<CefV8Value> jsFunction = irltkObj->GetValue(functionName);
+		context->Enter();
 
-	if (jsFunction && jsFunction->IsFunction())
-		jsFunction->ExecuteFunction(nullptr, arguments);
+		CefRefPtr<CefV8Value> globalObj = context->GetGlobal();
+		CefRefPtr<CefV8Value> irltkObj = globalObj->GetValue("irltk");
+		CefRefPtr<CefV8Value> jsFunction = irltkObj->GetValue(functionName);
 
-	context->Exit();
+		if (jsFunction && jsFunction->IsFunction())
+			jsFunction->ExecuteFunction(nullptr, arguments);
+
+		context->Exit();
+	}
 }
 
 bool BrowserApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefProcessId source_process, CefRefPtr<CefProcessMessage> message)
@@ -122,13 +128,6 @@ bool BrowserApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefP
 
 		ExecuteJSFunction(browser, "onActiveChange", arguments);
 	} else if (message->GetName() == "DispatchJSEvent") {
-		CefRefPtr<CefV8Context> context =
-			browser->GetMainFrame()->GetV8Context();
-
-		context->Enter();
-
-		CefRefPtr<CefV8Value> globalObj = context->GetGlobal();
-
 		nlohmann::json payloadJson = nlohmann::json::parse(
 			args->GetString(1).ToString(), nullptr, false);
 
@@ -144,20 +143,31 @@ bool BrowserApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefP
 		script += wrapperJsonString;
 		script += ");";
 
-		CefRefPtr<CefV8Value> returnValue;
-		CefRefPtr<CefV8Exception> exception;
+		std::vector<CefString> names;
+		browser->GetFrameNames(names);
+		for (auto &name : names) {
+			CefRefPtr<CefFrame> frame = browser->GetFrame(name);
+			CefRefPtr<CefV8Context> context = frame->GetV8Context();
 
-		/* Create the CustomEvent object
-		 * We have to use eval to invoke the new operator */
-		context->Eval(script, browser->GetMainFrame()->GetURL(), 0, returnValue, exception);
+			context->Enter();
 
-		CefV8ValueList arguments;
-		arguments.push_back(returnValue);
+			CefRefPtr<CefV8Value> globalObj = context->GetGlobal();
 
-		CefRefPtr<CefV8Value> dispatchEvent = globalObj->GetValue("dispatchEvent");
-		dispatchEvent->ExecuteFunction(nullptr, arguments);
+			CefRefPtr<CefV8Value> returnValue;
+			CefRefPtr<CefV8Exception> exception;
 
-		context->Exit();
+			/* Create the CustomEvent object
+			* We have to use eval to invoke the new operator */
+			context->Eval(script, browser->GetMainFrame()->GetURL(), 0, returnValue, exception);
+
+			CefV8ValueList arguments;
+			arguments.push_back(returnValue);
+
+			CefRefPtr<CefV8Value> dispatchEvent = globalObj->GetValue("dispatchEvent");
+			dispatchEvent->ExecuteFunction(nullptr, arguments);
+
+			context->Exit();
+		}
 	} else if (message->GetName() == "executeCallback") {
 		CefRefPtr<CefV8Context> context = browser->GetMainFrame()->GetV8Context();
 		CefRefPtr<CefV8Value> retval;
