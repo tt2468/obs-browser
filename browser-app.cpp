@@ -62,9 +62,10 @@ void BrowserApp::OnBeforeCommandLineProcessing(const CefString &, CefRefPtr<CefC
 		// Don't override existing, as this can break OSR
 		std::string disableFeatures = command_line->GetSwitchValue("disable-features");
 		disableFeatures += ",HardwareMediaKeyHandling";
+		disableFeatures += ",WebBluetooth";
 		command_line->AppendSwitchWithValue("disable-features", disableFeatures);
 	} else {
-		command_line->AppendSwitchWithValue("disable-features", "HardwareMediaKeyHandling");
+		command_line->AppendSwitchWithValue("disable-features", "WebBluetooth,HardwareMediaKeyHandling");
 	}
 
 	command_line->AppendSwitchWithValue("autoplay-policy", "no-user-gesture-required");
