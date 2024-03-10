@@ -20,7 +20,6 @@
 #include "obs-browser-source.hpp"
 #include "base64/base64.hpp"
 #include <nlohmann/json.hpp>
-#include <obs-frontend-api.h>
 #include <obs.hpp>
 #include <util/platform.h>
 

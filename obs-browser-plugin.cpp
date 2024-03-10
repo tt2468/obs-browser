@@ -16,7 +16,6 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
 
-#include <obs-frontend-api.h>
 #include <util/threading.h>
 #include <util/platform.h>
 #include <util/util.hpp>
