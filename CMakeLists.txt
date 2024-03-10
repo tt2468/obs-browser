@@ -100,4 +100,6 @@ endif()
 
 set_target_properties(obs-browser PROPERTIES FOLDER "plugins/obs-browser" PREFIX "")
 
+setup_target_browser(OBS::browser)
+
 setup_plugin_target(obs-browser)
