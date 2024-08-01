@@ -34,9 +34,10 @@ class BrowserApp : public CefApp, public CefRenderProcessHandler, public CefBrow
 	bool shared_texture_available;
 	CallbackMap callbackMap;
 	int callbackId;
+	bool wayland;
 
 public:
-	inline BrowserApp(bool shared_texture_available_ = false) : shared_texture_available(shared_texture_available_) {}
+	inline BrowserApp(bool shared_texture_available_ = false, bool wayland_ = false) : shared_texture_available(shared_texture_available_), wayland(wayland_) {}
 
 	virtual CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override;
 	virtual CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override;

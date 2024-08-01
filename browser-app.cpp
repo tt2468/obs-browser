@@ -69,6 +69,7 @@ void BrowserApp::OnBeforeCommandLineProcessing(const CefString &, CefRefPtr<CefC
 	}
 
 	command_line->AppendSwitchWithValue("autoplay-policy", "no-user-gesture-required");
+	command_line->AppendSwitchWithValue("ozone-platform", wayland ? "wayland" : "x11");
 }
 
 std::vector<std::string> exposedFunctions = {

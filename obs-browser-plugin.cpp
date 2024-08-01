@@ -36,6 +36,8 @@
 #include "obs-websocket-api/obs-websocket-api.h"
 #include "cef-headers.hpp"
 
+#include <obs-nix-platform.h>
+
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-browser", "en-US")
 MODULE_EXPORT const char *obs_module_description(void)
@@ -239,7 +241,7 @@ static void BrowserInit(void)
 
 	bool tex_sharing_avail = false;
 
-	app = new BrowserApp(tex_sharing_avail);
+	app = new BrowserApp(tex_sharing_avail, obs_get_nix_platform() == OBS_NIX_PLATFORM_WAYLAND);
 
 	/* Back up then restore configured signal handlers since
 	 * CefInitialize wipes them for some ungodly reason */
