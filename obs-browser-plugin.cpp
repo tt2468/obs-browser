@@ -31,7 +31,6 @@
 #include "browser-scheme.hpp"
 #include "browser-app.hpp"
 #include "browser-version.h"
-#include "browser-config.h"
 
 #include "signal-restore.hpp"
 #include "obs-websocket-api/obs-websocket-api.h"
