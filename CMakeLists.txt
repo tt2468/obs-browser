@@ -28,7 +28,6 @@ target_sources(
           cef-headers.hpp
           deps/base64/base64.cpp
           deps/base64/base64.hpp
-          deps/obs-websocket-api/obs-websocket-api.h
           deps/signal-restore.cpp
           deps/signal-restore.hpp
           deps/wide-string.cpp
@@ -40,7 +39,7 @@ target_sources(
 target_include_directories(obs-browser PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps")
 
 target_compile_features(obs-browser PRIVATE cxx_std_17)
-target_link_libraries(obs-browser PRIVATE OBS::libobs nlohmann_json::nlohmann_json)
+target_link_libraries(obs-browser PRIVATE OBS::libobs OBS::websocket-api nlohmann_json::nlohmann_json)
 
 if(OS_WINDOWS)
   include(cmake/os-windows.cmake)
